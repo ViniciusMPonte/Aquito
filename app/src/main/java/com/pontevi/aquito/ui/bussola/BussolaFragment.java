@@ -1,6 +1,7 @@
 package com.pontevi.aquito.ui.bussola;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,11 +13,17 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.pontevi.aquito.BussolaViewModel;
 import com.pontevi.aquito.R;
+import com.pontevi.aquito.network.websocket.LocalizacaoMessage;
+import com.pontevi.aquito.network.websocket.localizacao.LocalizacaoApiClient;
+import com.pontevi.aquito.network.websocket.localizacao.render.RenderLocalizacaoApiClient;
 
 public class BussolaFragment extends Fragment {
 
+    private static final String TAG = "WebSocket";
+
     private BussolaViewModel viewModel;
     private BussolaView bussolaView;
+    private LocalizacaoApiClient localizacaoApiClient;
 
     @Nullable
     @Override
@@ -36,6 +43,29 @@ public class BussolaFragment extends Fragment {
         viewModel.getAzimute().observe(getViewLifecycleOwner(), azimute -> {
             bussolaView.setAzimute(azimute);
         });
+
+        localizacaoApiClient = RenderLocalizacaoApiClient.criar();
+        localizacaoApiClient.conectar(new LocalizacaoApiClient.Listener() {
+            @Override
+            public void onConectado() {
+                Log.d(TAG, "Conectado!");
+            }
+
+            @Override
+            public void onLocalizacaoRecebida(LocalizacaoMessage mensagem) {
+                Log.d(TAG, "Lat: " + mensagem.latitude + " Lng: " + mensagem.longitude);
+            }
+
+            @Override
+            public void onErro(Throwable erro) {
+                Log.e(TAG, "Erro: " + erro.getMessage());
+            }
+
+            @Override
+            public void onDesconectado() {
+                Log.d(TAG, "Desconectado.");
+            }
+        });
     }
 
     @Override
@@ -48,5 +78,6 @@ public class BussolaFragment extends Fragment {
     public void onPause() {
         super.onPause();
         viewModel.pararSensor();
+        localizacaoApiClient.desconectar();
     }
 }
