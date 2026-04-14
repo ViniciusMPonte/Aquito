@@ -1,7 +1,6 @@
 package com.pontevi.aquito.ui.bussola;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,8 +15,8 @@ import com.pontevi.aquito.R;
 
 public class BussolaFragment extends Fragment {
 
-    private static final String TAG = "Bussola";
     private BussolaViewModel viewModel;
+    private BussolaView bussolaView;
 
     @Nullable
     @Override
@@ -31,10 +30,11 @@ public class BussolaFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        bussolaView = view.findViewById(R.id.bussola_view);
         viewModel = new ViewModelProvider(requireActivity()).get(BussolaViewModel.class);
 
         viewModel.getAzimute().observe(getViewLifecycleOwner(), azimute -> {
-            Log.d(TAG, "Azimute: " + azimute);
+            bussolaView.setAzimute(azimute);
         });
     }
 
