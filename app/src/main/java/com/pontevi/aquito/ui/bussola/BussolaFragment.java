@@ -13,6 +13,8 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.pontevi.aquito.BussolaViewModel;
 import com.pontevi.aquito.R;
+import com.pontevi.aquito.localizacao.GeoUtils;
+import com.pontevi.aquito.localizacao.LocalizacaoClient;
 import com.pontevi.aquito.network.websocket.LocalizacaoMessage;
 import com.pontevi.aquito.network.websocket.localizacao.LocalizacaoApiClient;
 import com.pontevi.aquito.network.websocket.localizacao.render.RenderLocalizacaoApiClient;
@@ -24,6 +26,7 @@ public class BussolaFragment extends Fragment {
     private BussolaViewModel viewModel;
     private BussolaView bussolaView;
     private LocalizacaoApiClient localizacaoApiClient;
+    private LocalizacaoClient localizacaoClient;
 
     @Nullable
     @Override
@@ -38,10 +41,22 @@ public class BussolaFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         bussolaView = view.findViewById(R.id.bussola_view);
-        viewModel = new ViewModelProvider(requireActivity()).get(BussolaViewModel.class);
 
-        viewModel.getAzimute().observe(getViewLifecycleOwner(), azimute -> {
-            bussolaView.setAzimute(azimute);
+        viewModel = new ViewModelProvider(requireActivity()).get(BussolaViewModel.class);
+        localizacaoClient = new LocalizacaoClient(requireContext());
+
+        viewModel.getAzimute().observe(getViewLifecycleOwner(), bussolaView::setAzimute);
+
+        view.findViewById(R.id.btn_enviar_localizacao).setOnClickListener(v -> {
+            localizacaoClient.obterLocalizacao()
+                    .thenAccept(location -> localizacaoApiClient.enviarLocalizacao(
+                            location.getLatitude(),
+                            location.getLongitude()
+                    ))
+                    .exceptionally(erro -> {
+                        Log.e(TAG, "Erro ao obter localização: " + erro.getMessage());
+                        return null;
+                    });
         });
 
         localizacaoApiClient = RenderLocalizacaoApiClient.criar();
@@ -54,6 +69,16 @@ public class BussolaFragment extends Fragment {
             @Override
             public void onLocalizacaoRecebida(LocalizacaoMessage mensagem) {
                 Log.d(TAG, "Lat: " + mensagem.latitude + " Lng: " + mensagem.longitude);
+
+                localizacaoClient.obterLocalizacao().thenAccept(minhaLocalizacao -> {
+                    float bearing = GeoUtils.calcularBearing(
+                            minhaLocalizacao.getLatitude(),
+                            minhaLocalizacao.getLongitude(),
+                            mensagem.latitude,
+                            mensagem.longitude
+                    );
+                    requireActivity().runOnUiThread(() -> bussolaView.setBearing(bearing));
+                });
             }
 
             @Override

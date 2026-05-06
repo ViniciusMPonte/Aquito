@@ -14,6 +14,7 @@ public class BussolaView extends View {
     private final Paint paintTexto = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private float azimute = 0f;
+    private float bearing = 0f;
 
     public BussolaView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -35,6 +36,11 @@ public class BussolaView extends View {
         invalidate();
     }
 
+    public void setBearing(float bearing) {
+        this.bearing = bearing;
+        invalidate();
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
@@ -51,7 +57,7 @@ public class BussolaView extends View {
         canvas.drawText("O", cx - raio + 10f, cy + 16f, paintTexto);
 
         canvas.save();
-        canvas.rotate(-azimute, cx, cy);
+        canvas.rotate(bearing - azimute, cx, cy);
         canvas.drawLine(cx, cy, cx, cy - raio * 0.7f, paintAgulha);
         canvas.restore();
     }
