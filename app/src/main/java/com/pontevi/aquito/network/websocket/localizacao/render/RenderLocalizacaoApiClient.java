@@ -11,6 +11,8 @@ import com.pontevi.aquito.network.websocket.LocalizacaoMessage;
 import com.pontevi.aquito.network.websocket.SalaMessage;
 import com.pontevi.aquito.network.websocket.localizacao.LocalizacaoApiClient;
 
+import java.util.UUID;
+
 import io.reactivex.disposables.CompositeDisposable;
 import ua.naiksoftware.stomp.Stomp;
 import ua.naiksoftware.stomp.StompClient;
@@ -21,6 +23,7 @@ public class RenderLocalizacaoApiClient implements LocalizacaoApiClient {
     private static final String TAG = "WebSocket";
 
     private final Gson gson = new Gson();
+    private final String uuid = UUID.randomUUID().toString();
     private StompClient stompClient;
     private CompositeDisposable disposables;
     private Listener listener;
@@ -73,16 +76,18 @@ public class RenderLocalizacaoApiClient implements LocalizacaoApiClient {
                 case "SAIU":
                     listener.onAlguemSaiu(json.get("apelido").getAsString());
                     break;
-                case "LOCALIZACAO":
-                    LocalizacaoMessage mensagem = gson.fromJson(json, LocalizacaoMessage.class);
-                    listener.onLocalizacaoRecebida(mensagem);
-                    break;
                 default:
                     Log.w(TAG, "Evento desconhecido: " + evento);
             }
-        }, erro -> Log.e(TAG, "Erro no tópico: " + erro.getMessage())));
+        }, erro -> Log.e(TAG, "Erro no tópico da sala: " + erro.getMessage())));
 
-        String json = gson.toJson(new EntrarMessage(chave, apelido));
+        disposables.add(stompClient.topic(RenderLocalizacaoApi.TOPICO_SALA + chave + "/" + uuid).subscribe(frame -> {
+            JsonObject json = JsonParser.parseString(frame.getPayload()).getAsJsonObject();
+            LocalizacaoMessage mensagem = gson.fromJson(json, LocalizacaoMessage.class);
+            listener.onLocalizacaoRecebida(mensagem);
+        }, erro -> Log.e(TAG, "Erro no tópico pessoal: " + erro.getMessage())));
+
+        String json = gson.toJson(new EntrarMessage(chave, apelido, uuid));
         disposables.add(
                 stompClient.send(RenderLocalizacaoApi.DESTINO_ENTRAR, json).subscribe(
                         () -> Log.d(TAG, "Entrou na sala: " + chave),
