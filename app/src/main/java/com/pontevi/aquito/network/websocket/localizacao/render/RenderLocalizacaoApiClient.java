@@ -3,8 +3,12 @@ package com.pontevi.aquito.network.websocket.localizacao.render;
 import android.util.Log;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.pontevi.aquito.network.HttpClient;
+import com.pontevi.aquito.network.websocket.EntrarMessage;
 import com.pontevi.aquito.network.websocket.LocalizacaoMessage;
+import com.pontevi.aquito.network.websocket.SalaMessage;
 import com.pontevi.aquito.network.websocket.localizacao.LocalizacaoApiClient;
 
 import io.reactivex.disposables.CompositeDisposable;
@@ -19,6 +23,8 @@ public class RenderLocalizacaoApiClient implements LocalizacaoApiClient {
     private final Gson gson = new Gson();
     private StompClient stompClient;
     private CompositeDisposable disposables;
+    private Listener listener;
+    private String chaveAtual;
 
     private RenderLocalizacaoApiClient() {}
 
@@ -28,6 +34,7 @@ public class RenderLocalizacaoApiClient implements LocalizacaoApiClient {
 
     @Override
     public void conectar(Listener listener) {
+        this.listener = listener;
         disposables = new CompositeDisposable();
 
         stompClient = Stomp.over(
@@ -47,20 +54,49 @@ public class RenderLocalizacaoApiClient implements LocalizacaoApiClient {
             }
         }, erro -> Log.e(TAG, "Erro no lifecycle: " + erro.getMessage())));
 
-        disposables.add(stompClient.topic(RenderLocalizacaoApi.TOPICO).subscribe(frame -> {
-            LocalizacaoMessage mensagem = gson.fromJson(frame.getPayload(), LocalizacaoMessage.class);
-            listener.onLocalizacaoRecebida(mensagem);
-        }, erro -> Log.e(TAG, "Erro no tópico: " + erro.getMessage())));
-
         stompClient.connect();
     }
 
     @Override
-    public void enviarLocalizacao(double latitude, double longitude) {
+    public void entrar(String chave, String apelido) {
         if (stompClient == null || !stompClient.isConnected()) return;
-        String json = gson.toJson(new LocalizacaoMessage(latitude, longitude));
+        chaveAtual = chave;
+
+        disposables.add(stompClient.topic(RenderLocalizacaoApi.TOPICO_SALA + chave).subscribe(frame -> {
+            JsonObject json = JsonParser.parseString(frame.getPayload()).getAsJsonObject();
+            String evento = json.get("evento").getAsString();
+
+            switch (evento) {
+                case "ENTROU":
+                    listener.onAlguemEntrou(json.get("apelido").getAsString());
+                    break;
+                case "SAIU":
+                    listener.onAlguemSaiu(json.get("apelido").getAsString());
+                    break;
+                case "LOCALIZACAO":
+                    LocalizacaoMessage mensagem = gson.fromJson(json, LocalizacaoMessage.class);
+                    listener.onLocalizacaoRecebida(mensagem);
+                    break;
+                default:
+                    Log.w(TAG, "Evento desconhecido: " + evento);
+            }
+        }, erro -> Log.e(TAG, "Erro no tópico: " + erro.getMessage())));
+
+        String json = gson.toJson(new EntrarMessage(chave, apelido));
         disposables.add(
-                stompClient.send(RenderLocalizacaoApi.DESTINO, json).subscribe(
+                stompClient.send(RenderLocalizacaoApi.DESTINO_ENTRAR, json).subscribe(
+                        () -> Log.d(TAG, "Entrou na sala: " + chave),
+                        erro -> Log.e(TAG, "Erro ao entrar: " + erro.getMessage())
+                )
+        );
+    }
+
+    @Override
+    public void enviarLocalizacao(double latitude, double longitude) {
+        if (stompClient == null || !stompClient.isConnected() || chaveAtual == null) return;
+        String json = gson.toJson(new LocalizacaoMessage(chaveAtual, latitude, longitude));
+        disposables.add(
+                stompClient.send(RenderLocalizacaoApi.DESTINO_LOCALIZACAO, json).subscribe(
                         () -> Log.d(TAG, "Localização enviada"),
                         erro -> Log.e(TAG, "Erro ao enviar: " + erro.getMessage())
                 )
@@ -68,8 +104,22 @@ public class RenderLocalizacaoApiClient implements LocalizacaoApiClient {
     }
 
     @Override
+    public void sair() {
+        if (stompClient == null || !stompClient.isConnected() || chaveAtual == null) return;
+        String json = gson.toJson(new SalaMessage(chaveAtual));
+        disposables.add(
+                stompClient.send(RenderLocalizacaoApi.DESTINO_SAIR, json).subscribe(
+                        () -> Log.d(TAG, "Saiu da sala: " + chaveAtual),
+                        erro -> Log.e(TAG, "Erro ao sair: " + erro.getMessage())
+                )
+        );
+        chaveAtual = null;
+    }
+
+    @Override
     public void desconectar() {
         if (disposables != null) disposables.dispose();
         if (stompClient != null) stompClient.disconnect();
+        chaveAtual = null;
     }
 }

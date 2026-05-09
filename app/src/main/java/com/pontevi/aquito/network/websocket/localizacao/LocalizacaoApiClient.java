@@ -6,12 +6,16 @@ public interface LocalizacaoApiClient {
 
     interface Listener {
         void onConectado();
-        void onLocalizacaoRecebida(LocalizacaoMessage mensagem);
-        void onErro(Throwable erro);
         void onDesconectado();
+        void onErro(Throwable erro);
+        void onAlguemEntrou(String apelido);
+        void onAlguemSaiu(String apelido);
+        void onLocalizacaoRecebida(LocalizacaoMessage mensagem);
     }
 
     void conectar(Listener listener);
+    void entrar(String chave, String apelido);
     void enviarLocalizacao(double latitude, double longitude);
+    void sair();
     void desconectar();
 }
