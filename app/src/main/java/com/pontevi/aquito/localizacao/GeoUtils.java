@@ -15,6 +15,6 @@ public class GeoUtils {
                 - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
 
         double bearing = Math.toDegrees(Math.atan2(x, y));
-        return (float) ((bearing + 360) % 360);
+        return (float) ((bearing + 450) % 360);
     }
 }
